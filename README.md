@@ -13,7 +13,7 @@ To run and edith the app yourself, fork this repository and open the `prep_data.
 If you would like to submit improvements upon the app, contact Sophie Ruehr (sophie.ruehr (at) berkeley.edu) or create a well-commented push request on GitHub.
 
 ## Citation
-If using any of these tools in publication or presentations, please acknowledge as "AmeriFlux Data Visualization Tool, Sophie Ruehr (2022)."
+If using any of these tools in publication or presentations, please acknowledge as "AmeriFlux Data Visualization Tool, Sophie Ruehr (2022), 10.5281/zenodo.7023749."
 
 ## Acknowledgements
 This application was developed by Sophie Ruehr with support from members of the AmeriFlux community and management team: Rachel Hollowgrass, Karla Leibowitz, Christin Buechner, Housen Chu, Trevor Keenan and Margaret Torn.
