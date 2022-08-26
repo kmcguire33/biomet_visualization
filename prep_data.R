@@ -2,7 +2,7 @@
 # AmeriFlux Sandboxing 3,000 site years
 # Preparing data from raw AmeriFlux files
 
-# August 22, 2022
+# August 26, 2022
 # Sophie Ruehr
 # sophie_ruehr@berkeley.edu
 # ------------------------------------------------------------------
@@ -15,91 +15,19 @@ rm(list = ls())
 p_load(dplyr, ggplot2, readxl, cowplot, png, tidyr, naniar, GGally)
 
 # Set working directories for data (raw download from AmeriFlux server) and saving outputs
-datawd <- '/Volumes/Torpedo/Data.nosync/ameriflux_2022_05_06_full_download'
-savewd <- '/Users/sophieruehr/Documents/Academic/Berkeley/Projects/sandbox/August_attempt_5'
+datawd <- '/Volumes/Torpedo/Data.nosync/ameriflux_2022_08_26_full_download'
+savewd <- '/Users/sophieruehr/Documents/Academic/Berkeley/Projects/sandbox/August_attempt_6'
 
 # Get names of flux sites
 setwd(datawd)
 files <- list.files()
 sites <- substr(files, 5, 10) 
-# Variables of interest for individual site plots
-var_of_interest <- c('GPP', 'NEE', 'RECO', # Ecosystem productivity and C fluxes
-                     'VPD', 'RH',  'TA', # Meteorological variables
-                     'USTAR', # Atmospheric stability / roughness length approximation (proxy for 'good' EC conditions)
-                     'P','SWC', # Water availability 
-                     'LE','H', 'NETRAD', 'G' # Surface energy balance
-)
 
-# 2. INDIVIDUAL SITE DAILY DATA WITH VARS OF INTEREST ----- 
-repthrough <- c(1:length(files)) 
-# Some sites (i=182, 188, 191, 192, 196, 280) posed problems when data were read in. Skipping these.
-repthrough <- repthrough[-c(182, 188, 191, 192, 196)]
-# Print bad files
-files[c(182, 188, 191, 192, 196)] 
-
-outdata <- data.frame()
-for (i in repthrough) { # Loop through all flux sites (except for those that don't work)
-  # Read in data
-  setwd(datawd)
-  setwd(paste0('./', files[i])) # Set wd to subfolder for each site
-  file <- list.files(pattern = '.csv')[1] 
-  site <- substr(file, 5, 10) # Get site name
-  cols <- colnames(read.csv(file, header = T, skip = 2, nrow = 1)) # Get column names
-  
-  # Get index of each column of variable of interest
-  vars <- sapply(strsplit(cols,"_"),'[',1) 
-  indexvar <- c()
-  for (j in 1:length(var_of_interest)) {
-    indexvar[j] <- which(vars %in% var_of_interest[j])[1] # If multiple sensors/positions, take first appearing in dataset
-  }
-  indexvar <- na.omit(indexvar) # Column indices of interest
-  
-  if(sum(indexvar > 0)) { # Data contains at least one variable of interest
-    
-    # Read in data
-      # Create vector to only read in variables of interest
-    vec <- c(rep('NULL', length(cols)))
-    vec[1] <- 'character'
-    vec[c(indexvar)] <- 'numeric' 
-    data <- read.table(file, header = TRUE, skip = 2, sep = ",",
-                       colClasses = vec, fill = T)
-    
-    # Mark missing data with NA
-    data[data == -9999] <- NA
- 
-    if (dim(data)[1] > 0) { # Continue if there is data contained in the `data` object
-      
-      # Set date time
-      data$TIMESTAMP_START <- as.POSIXct(as.character(data$TIMESTAMP_START),
-                                         format="%Y%m%d%H%M")
-      
-      # Rename columns to short names
-      names <- sapply(strsplit(colnames(data),"_"),'[',1)[-1]
-      colnames(data) <- c('date', names)
-      
-      # Average by day (to diminish data size)
-      data$date <- as.Date(data$date)
-      data <- data %>% group_by(date) %>% summarise_all(.funs = mean, na.rm = T)
-      data <- as.data.frame(data)
-      
-      # Write new data file
-      setwd(savewd)
-      site <- sites[i]
-      filename <- paste0(site, '.csv')
-      write.csv(data, filename)
-      
-      print(sites[i])
-    }
-  }
-}
-
-
-# 3. SUMMARY STATISTICS AND MISSING DATA (all variables at each site) ------ 
+# 2. INDIVIDUAL SITE DAILY DATA, SUMMARIES, MISSING DATA ----- 
 summary_stats_out <- list()
 missing_out <- list()
 setwd(datawd)
-
-for (i in repthrough) { # Loop through all flux sites 
+for (i in 1:length(files)) { # Loop through all flux sites 
   
   # Read in data 
   setwd(datawd)
@@ -136,11 +64,22 @@ for (i in repthrough) { # Loop through all flux sites
   summary_stats_out[[i]] <- summary_stats # Add site to list of summary statistics
   names(summary_stats_out)[[i]] <- site # Name list with site name
   
-  
-  # 2. Get missing data by year
+
+  # 2. Get averaged daily data 
   
   # Average by day (to diminish data size)
-  data$date <- as.Date(data$TIMESTAMP_START)
+  data$date <- as.Date(data$TIMESTAMP_START) # Create date variable
+  dat_daily <- data %>% group_by(date) %>% summarise_all(.funs = mean, na.rm = T) # Take average of each variable for each unique date
+  dat_daily <- dat_daily %>% subset(select = -c(TIMESTAMP_START, TIMESTAMP_END)) # Get rid of timestamp variables
+  setwd(savewd) 
+  site <- sites[i]
+  filename <- paste0(site, '.csv')
+  write.csv(dat_daily, filename) # Write site level data file
+  
+  
+  # 3. Get missing data by year
+  
+  # Get missing data 
   data <- data[,-c(1,2)] # Get rid of timestamp variables
   data$year <- as.numeric(format(data$date, '%Y')) # Create year variable
   data <- data %>% filter(!is.na(year)) %>% # Get number of NA by year and variable
@@ -158,10 +97,10 @@ for (i in repthrough) { # Loop through all flux sites
 }
 
 setwd(savewd)
-saveRDS(summary_stats_out, 'summary_stats.RDS')
-saveRDS(missing_out, 'missing_data_by_year.RDS')
+saveRDS(summary_stats_out, 'summary_stats.RDS') # Write summary data
+saveRDS(missing_out, 'missing_data_by_year.RDS') # Write missing data
 
-# 4. DOIS and site info -----
+# 3. DOIS and site info -----
 doiout <- c()
 setwd(datawd)
 for (i in 1:length(sites)) {
@@ -198,24 +137,51 @@ setwd(savewd)
 # Save DOI information
 write.csv(doiout, 'dois.csv')
 
-# 5. SMALLER DATASET TO PLOT ALL SITES AT ONCE -----
+# 4. CREATE SMALLER DATASET TO PLOT ALL SITES AT ONCE -----
 setwd(savewd)
 # Open DOI file
 doiout <- read.csv('dois.csv')
 # Get files for all sites
 files <- list.files(pattern = '.csv')
-files <- files[-c(which(files == 'dois.csv'), which(files == 'all_sites.csv'))]
+files <- files[-c(which(files == 'dois.csv'), which(files == 'all_sites.csv'), 
+                  which(files == 'units.csv'))]
 set.seed(123) # Set seed for reproducible sampling
-datout <- matrix(ncol = length(var_of_interest)) 
+
+# Only a few variables
+var_of_interest <- c('GPP', 'NEE', 'RECO','FC', # Ecosystem productivity and C fluxes
+                     'VPD', 'RH',  'TA', # Meteorological variables
+                     'USTAR', # Atmospheric stability / roughness length approximation (proxy for 'good' EC conditions)
+                     'P','SWC', # Water availability 
+                     'LE','H', 'NETRAD', 'G', # Surface energy balance
+                     'date'
+)
+datout <- data.frame()
 
 # Loop through all sites and sample smaller portion of data to create small file with all sites represented
-colnames(datout) <- var_of_interest
+
 for (i in 1:length(files)) {
   # Open daily averaged data at site
   file <- files[i]
-  data <- read.csv(file)
-  data$Date <- data$date
-  data <- data  %>%  subset(select = -c(X, date))
+  
+  cols <- colnames(read.csv(file, nrow = 1)) # Get column names
+  
+  # Get index of each column of variable of interest
+  vars <- sapply(strsplit(cols,"_"),'[',1) 
+  indexvar <- c()
+  for (j in 1:length(var_of_interest)) {
+    indexvar[j] <- which(vars %in% var_of_interest[j])[1] # If multiple sensors/positions, take first appearing in dataset
+  }
+  indexvar <- na.omit(indexvar)
+  
+  vec <- c(rep('NULL', length(cols))) 
+  vec[c(indexvar)] <- 'numeric'  # Only read in columns of interest
+  vec[2] <- 'character' # Date index
+  
+  data <- read.table(file, sep = ',', header = TRUE, 
+                     colClasses = vec, fill = T)
+  
+  names <- sapply(strsplit(colnames(data),"_"),'[',1)[-1] # Rename columns
+  colnames(data) <- c('Date', names)
   
   # Take a 2% random sample of data from the site
   samp <- sample(dim(data)[1], size = round(dim(data)[1] * 0.02, 0), replace = FALSE) 
