@@ -1,4 +1,4 @@
-# ameriflux_visualization
+# Ameriflux Visualization
 An RShiny app to visualize AmeriFlux data
 
 ## About the data
